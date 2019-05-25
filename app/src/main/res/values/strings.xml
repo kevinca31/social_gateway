@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">SocialGateway</string>
+    <string name="whats_app">WhatsApp</string>
+    <string name="telegram">Telegram</string>
+
+
+    <string name="X_was_not_found_on_your_device">%1$s was not found on your device</string>
+</resources>
