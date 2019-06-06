@@ -11,6 +11,7 @@ import android.widget.Toast
 import org.json.JSONObject
 import java.net.ConnectException
 import java.net.HttpURLConnection
+import java.net.HttpURLConnection.HTTP_OK
 import java.net.URL
 import java.util.*
 
@@ -29,7 +30,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val userId = UUID.randomUUID().toString()  // TODO
+        val userId = UUID.randomUUID().toString()  // TODO: store user_id
 
 
         val socialApps = listOf(
@@ -46,20 +47,20 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 AsyncTask.execute {
-                    var question: String
+                    val question: String
+                    val questionConnection = openConnection("/question?app_name=${socialApp.name}")
                     try {
-                        openConnection("/question").apply {
-                            if (responseCode != 200) {
-                                throw ConnectException("response code $responseCode")
-                            }
-
-                            question = inputStream.reader().readText()
-                            disconnect()
+                        if (questionConnection.responseCode != HTTP_OK) {
+                            throw ConnectException("response code ${questionConnection.responseCode}")
                         }
+
+                        question = questionConnection.inputStream.reader().readText()
                     } catch (exception: ConnectException) {
                         startActivity(intent)
                         Log.d("aaaaaa", "could not request question: ${exception.message.orEmpty()}")
                         return@execute
+                    } finally {
+                        questionConnection.disconnect()
                     }
 
                     runOnUiThread {
@@ -70,26 +71,28 @@ class MainActivity : AppCompatActivity() {
                             setNegativeButton(android.R.string.cancel) { _, _ -> }
                             setPositiveButton(android.R.string.ok) { _, _ ->
                                 AsyncTask.execute {
+                                    val answerConnection = openConnection("/answer")
                                     try {
-                                        openConnection("/answer").apply {
-                                            requestMethod = "POST"
-                                            doOutput = true
-                                            val answer = answerEditText.text.toString()
-                                            val answerJson = JSONObject("{" +
-                                                    "user_id: $userId," +
-                                                    "app_name: ${socialApp.name}," +
-                                                    "question: $question," +
-                                                    "answer: $answer," +
-                                                    "}")
-                                            outputStream.write(answerJson.toString().toByteArray())
-                                            if (responseCode != 200) {
-
-                                                throw ConnectException("response code $responseCode")
-                                            }
-                                            disconnect()
+                                        answerConnection.requestMethod = "POST"
+                                        answerConnection.doOutput = true
+                                        val answer = answerEditText.text.toString()
+                                        val answerJson = JSONObject(
+                                            """{
+                                                    user_id: "$userId",
+                                                    app_name: "${socialApp.name}",
+                                                    question: "$question",
+                                                    answer: "$answer"
+                                                    }"""
+                                        )
+                                        answerConnection.outputStream.write(answerJson.toString().toByteArray())
+                                        if (answerConnection.responseCode != HTTP_OK) {
+                                            throw ConnectException("response code ${answerConnection.responseCode}")
                                         }
+
                                     } catch (exception: ConnectException) {
                                         Log.d("aaaaaa", "could not send answer: ${exception.message.orEmpty()}")
+                                    } finally {
+                                        answerConnection.disconnect()
                                     }
                                 }
                                 startActivity(intent)
