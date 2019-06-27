@@ -5,4 +5,8 @@
 
 
     <string name="X_was_not_found_on_your_device">%1$s was not found on your device</string>
+    <string name="start_recording">start recording</string>
+    <string name="type_answer_here_or_record_audio">type answer here or record audio</string>
+    <string name="stop_recording">stop recording</string>
+    <string name="delete_recording">delete recording</string>
 </resources>
