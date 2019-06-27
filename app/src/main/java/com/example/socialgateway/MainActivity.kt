@@ -24,18 +24,7 @@ data class SocialApp(
     val buttonId: Int)
 
 fun openConnection(route: String): HttpURLConnection {
-    return URL("http://192.168.178.23:5000$route").openConnection() as HttpURLConnection
-}
-
-fun startAudioRecording() : MediaRecorder {
-    return MediaRecorder().apply {
-        setAudioSource(MediaRecorder.AudioSource.MIC)
-        setOutputFormat(MediaRecorder.OutputFormat.AAC_ADTS)
-        setOutputFile("social_gateway_answer_audio")
-        setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-        prepare()
-        start()
-    }
+    return URL("http://192.168.178.30:5000$route").openConnection() as HttpURLConnection
 }
 
 fun postToServer(data: ByteArray, route: String) {
@@ -56,33 +45,16 @@ fun postToServer(data: ByteArray, route: String) {
     }
 }
 
-fun sendAnswer(userId: String, appName: String, question: String, answerText: String) {
-    var answerAudioUuid = ""
-
-    val answerAudio = File("social_gateway_answer_audio")
-    if (answerAudio.exists()) {
-        answerAudioUuid = UUID.randomUUID().toString()
-        answerAudio.renameTo(File(answerAudioUuid))
-        postToServer(answerAudio.readBytes(), "/audio")
-        answerAudio.delete()
-    }
-
-    postToServer(JSONObject("""{
-            user_id: "$userId",
-            app_name: "$appName",
-            question: "$question",
-            answer_text: "$answerText",
-            answer_audio_uuid: "$answerAudioUuid"
-        }""").toString().toByteArray(), "/answer")
-}
-
 class MainActivity : AppCompatActivity() {
 
     private var userId = "null"
+    private lateinit var answerAudioFile: File
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        answerAudioFile = cacheDir.resolve("social_gateway_answer_audio.aac")
 
         userId = getPreferences(Context.MODE_PRIVATE).getString("userId", "").orEmpty()
         if (userId == "") {
@@ -118,6 +90,7 @@ class MainActivity : AppCompatActivity() {
 
                 question = questionConnection.inputStream.reader().readText()
             } catch (exception: ConnectException) {
+                Toast.makeText(this, "server unreachable, starting app...", Toast.LENGTH_SHORT).show()
                 startActivity(intent)
                 Log.d("aaaaaa", "could not request question: ${exception.message.orEmpty()}")
                 return@execute
@@ -135,7 +108,7 @@ class MainActivity : AppCompatActivity() {
                     val valMediaRecorder = mediaRecorder
                     when {
                         answerRecordAudioButton.text == getString(R.string.delete_recording) -> {
-                            deleteFile("social_gateway_answer_audio")
+                            answerAudioFile.delete()
                             answerRecordAudioButton.text = getString(R.string.start_recording)
                         }
                         valMediaRecorder == null -> {
@@ -158,6 +131,15 @@ class MainActivity : AppCompatActivity() {
                     setView(linearLayout)
                     setNegativeButton(android.R.string.cancel) { _, _ -> }
                     setPositiveButton(android.R.string.ok) { _, _ ->
+                        val valMediaRecorder = mediaRecorder
+                        if (valMediaRecorder != null) {
+                            valMediaRecorder.apply {
+                                stop()
+                                release()
+                            }
+                            answerAudioFile.delete()
+                        }
+
                         sendAnswer(userId, socialApp.name, question, answerEditText.text.toString())
                         startActivity(intent)
                     }
@@ -168,11 +150,40 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun sendAnswer(userId: String, appName: String, question: String, answerText: String) {
+        var answerAudioUuid = "null"
+
+        if (answerAudioFile.exists()) {
+            answerAudioUuid = UUID.randomUUID().toString()
+            postToServer(answerAudioFile.readBytes(), "/audio?uuid=$answerAudioUuid")
+            answerAudioFile.delete()
+        }
+
+        postToServer(JSONObject("""{
+            "user_id": "$userId",
+            "app_name": "$appName",
+            "question": "$question",
+            "answer_text": "$answerText",
+            "answer_audio_uuid": "$answerAudioUuid"
+        }""").toString().toByteArray(), "/answer")
+    }
+
+    private fun startAudioRecording() : MediaRecorder {
+        return MediaRecorder().apply {
+            setAudioSource(MediaRecorder.AudioSource.MIC)
+            setOutputFormat(MediaRecorder.OutputFormat.AAC_ADTS)
+            setOutputFile(answerAudioFile.absolutePath)
+            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            prepare()
+            start()
+        }
+    }
+
     override fun onPause() {
         super.onPause()
         getPreferences(Context.MODE_PRIVATE).edit().apply {
             putString("userId", userId)
-            commit()
+            apply()
         }
     }
 }
