@@ -57,7 +57,7 @@ fun postToServer(data: ByteArray, route: String) {
 }
 
 fun sendAnswer(userId: String, appName: String, question: String, answerText: String) {
-    var answerAudioUuid = "null"
+    var answerAudioUuid = ""
 
     val answerAudio = File("social_gateway_answer_audio")
     if (answerAudio.exists()) {
@@ -84,7 +84,10 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        userId = getPreferences(Context.MODE_PRIVATE).getString("userId", UUID.randomUUID().toString()).orEmpty()
+        userId = getPreferences(Context.MODE_PRIVATE).getString("userId", "").orEmpty()
+        if (userId == "") {
+            userId = UUID.randomUUID().toString()
+        }
 
         val socialApps = listOf(
             SocialApp(resources.getString(R.string.whats_app), "com.whatsapp", R.id.whats_app_button),
