@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.Toast
 import org.json.JSONObject
 import java.io.File
@@ -65,7 +66,7 @@ class MainActivity : AppCompatActivity() {
             SocialApp(resources.getString(R.string.whats_app), "com.whatsapp", R.id.whats_app_button),
             SocialApp(resources.getString(R.string.telegram), "org.telegram.messenger", R.id.telegram_button))
         socialApps.forEach { socialApp ->
-            val button = findViewById<Button>(socialApp.buttonId)
+            val button = findViewById<ImageView>(socialApp.buttonId)
             button.setOnClickListener {
                 onButtonClick(socialApp)
             }
@@ -90,7 +91,9 @@ class MainActivity : AppCompatActivity() {
 
                 question = questionConnection.inputStream.reader().readText()
             } catch (exception: ConnectException) {
-                Toast.makeText(this, "server unreachable, starting app...", Toast.LENGTH_SHORT).show()
+                runOnUiThread {
+                    Toast.makeText(this, "server unreachable, starting app...", Toast.LENGTH_SHORT).show()
+                }
                 startActivity(intent)
                 Log.d("aaaaaa", "could not request question: ${exception.message.orEmpty()}")
                 return@execute
