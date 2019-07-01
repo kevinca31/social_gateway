@@ -8,13 +8,13 @@
         android:layout_margin="20dp"
         tools:context=".MainActivity">
 
-    <android.support.v7.widget.AppCompatImageView
+    <android.support.v7.widget.AppCompatImageButton
             android:id="@+id/whats_app_button"
             android:layout_width="100dp"
             android:layout_height="100dp"
             android:src="@drawable/whatsapp"/>
 
-    <android.support.v7.widget.AppCompatImageView
+    <android.support.v7.widget.AppCompatImageButton
             android:id="@+id/telegram_button"
             android:layout_width="100dp"
             android:layout_height="100dp"

@@ -1,16 +1,17 @@
 package com.example.socialgateway
 
 import android.app.AlertDialog
+import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProvider
 import android.content.Context
+import android.content.Intent
 import android.media.MediaRecorder
 import android.os.AsyncTask
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ImageView
-import android.widget.Toast
+import android.widget.*
 import org.json.JSONObject
 import java.io.File
 import java.net.ConnectException
@@ -66,7 +67,7 @@ class MainActivity : AppCompatActivity() {
             SocialApp(resources.getString(R.string.whats_app), "com.whatsapp", R.id.whats_app_button),
             SocialApp(resources.getString(R.string.telegram), "org.telegram.messenger", R.id.telegram_button))
         socialApps.forEach { socialApp ->
-            val button = findViewById<ImageView>(socialApp.buttonId)
+            val button = findViewById<ImageButton>(socialApp.buttonId)
             button.setOnClickListener {
                 onButtonClick(socialApp)
             }
@@ -187,6 +188,20 @@ class MainActivity : AppCompatActivity() {
         getPreferences(Context.MODE_PRIVATE).edit().apply {
             putString("userId", userId)
             apply()
+        }
+    }
+}
+
+class MyAppWidgetProvider : AppWidgetProvider() {
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        appWidgetIds.forEach { appWidgetId ->
+            val pendingIntent = Intent(context, MainActivity::class.java).let { intent ->
+                PendingIntent.getActivity(context, 0, intent, 0)
+            }
+            val views = RemoteViews(context.packageName, R.layout.widget_telegram).apply {
+                setOnClickPendingIntent(R.id.telegram_widget_button, pendingIntent)
+            }
+            appWidgetManager.updateAppWidget(appWidgetId, views)
         }
     }
 }
