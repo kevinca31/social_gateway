@@ -67,7 +67,7 @@ class MainActivity : AppCompatActivity() {
             SocialApp(resources.getString(R.string.whats_app), "com.whatsapp", R.id.whats_app_button),
             SocialApp(resources.getString(R.string.telegram), "org.telegram.messenger", R.id.telegram_button))
         socialApps.forEach { socialApp ->
-            val button = findViewById<ImageButton>(socialApp.buttonId)
+            val button = findViewById<ImageView>(socialApp.buttonId)
             button.setOnClickListener {
                 onButtonClick(socialApp)
             }
