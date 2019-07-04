@@ -1,5 +1,6 @@
 package com.example.socialgateway
 
+import android.app.Activity
 import android.app.AlertDialog
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -217,16 +218,46 @@ class MyAppWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         appWidgetIds.forEach { appWidgetId ->
             val pendingIntent = Intent(context, QuestionBeforeLaunchActivity::class.java).let {
-                val socialApp = SocialApp(context.resources.getString(R.string.telegram), "org.telegram.messenger", R.id.telegram_button)
-                it.putExtra("socialAppName", socialApp.name)
-                it.putExtra("socialAppPackageName", socialApp.packageName)
+                // TODO get values from intent
+                it.putExtra("socialAppName", context.resources.getString(R.string.telegram))
+                it.putExtra("socialAppPackageName", "org.telegram.messenger")
                 return@let PendingIntent.getActivity(context, 0, it, 0)
             }
 
-            RemoteViews(context.packageName, R.layout.widget_telegram).let {
-                it.setOnClickPendingIntent(R.id.telegram_widget_button, pendingIntent)
+//            RemoteViews(context.packageName, R.layout.widget_telegram).let {
+//                it.setOnClickPendingIntent(R.id.telegram_widget_button, pendingIntent)
+//                appWidgetManager.updateAppWidget(appWidgetId, it)
+//            }
+
+            RemoteViews(context.packageName, R.layout.widget).let {
+                it.setOnClickPendingIntent(R.id.widget_button, pendingIntent)
                 appWidgetManager.updateAppWidget(appWidgetId, it)
             }
         }
+    }
+}
+
+class WidgetConfiguratorActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        val appWidgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID,
+            AppWidgetManager.INVALID_APPWIDGET_ID) ?: AppWidgetManager.INVALID_APPWIDGET_ID
+
+        // TODO configure
+        val socialAppName = resources.getString(R.string.telegram)
+        val socialAppPackageName = "org.telegram.messenger"
+
+        val appWidgetManager: AppWidgetManager = AppWidgetManager.getInstance(this)
+
+        appWidgetManager.updateAppWidget(appWidgetId, RemoteViews(packageName, R.layout.widget))
+
+        val resultValue = Intent().apply {
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            putExtra("socialAppName", socialAppName)
+            putExtra("socialAppPackageName", socialAppPackageName)
+        }
+        setResult(Activity.RESULT_OK, resultValue)
+        finish()
     }
 }
