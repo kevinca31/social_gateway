@@ -217,8 +217,9 @@ class MyAppWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         appWidgetIds.forEach { appWidgetId ->
             val pendingIntent = Intent(context, QuestionBeforeLaunchActivity::class.java).let {
-//                it.putExtra("socialAppName", socialApp.name)
-//                it.putExtra("socialAppPackageName", socialApp.packageName)
+                val socialApp = SocialApp(context.resources.getString(R.string.telegram), "org.telegram.messenger", R.id.telegram_button)
+                it.putExtra("socialAppName", socialApp.name)
+                it.putExtra("socialAppPackageName", socialApp.packageName)
                 return@let PendingIntent.getActivity(context, 0, it, 0)
             }
 
