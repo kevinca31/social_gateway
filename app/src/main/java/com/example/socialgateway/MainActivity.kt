@@ -49,19 +49,9 @@ fun postToServer(data: ByteArray, route: String) {
 
 class MainActivity : AppCompatActivity() {
 
-    private var userId = "null"
-    private lateinit var answerAudioFile: File
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        answerAudioFile = cacheDir.resolve("social_gateway_answer_audio.aac")
-
-        userId = getPreferences(Context.MODE_PRIVATE).getString("userId", "").orEmpty()
-        if (userId == "") {
-            userId = UUID.randomUUID().toString()
-        }
 
         val socialApps = listOf(
             SocialApp(resources.getString(R.string.whats_app), "com.whatsapp", R.id.whats_app_button),
@@ -69,22 +59,49 @@ class MainActivity : AppCompatActivity() {
         socialApps.forEach { socialApp ->
             val button = findViewById<ImageView>(socialApp.buttonId)
             button.setOnClickListener {
-                onButtonClick(socialApp)
+                startActivity(Intent(this, QuestionBeforeLaunchActivity::class.java).apply {
+                    putExtra("socialAppName", socialApp.name)
+                    putExtra("socialAppPackageName", socialApp.packageName)
+                })
             }
         }
     }
+}
 
-    private fun onButtonClick(socialApp: SocialApp) {
-        val intent = packageManager.getLaunchIntentForPackage(socialApp.packageName)
-        if (intent == null) {
-            val message = resources.getString(R.string.X_was_not_found_on_your_device, socialApp.name)
+class QuestionBeforeLaunchActivity : AppCompatActivity() {
+
+    private lateinit var userId: String
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        userId = getPreferences(Context.MODE_PRIVATE).getString("userId", "").orEmpty().ifEmpty {
+            UUID.randomUUID().toString()
+        }
+
+        val socialAppName = intent?.extras?.getString("socialAppName").orEmpty()
+
+        //TODO
+        assert(socialAppName.isNotEmpty())
+        if (socialAppName.isEmpty()) {
+            Log.d("aaaaaa", "socialAppName must not be empty")
+            throw Error("socialAppName must not be empty")
+        }
+
+        val socialAppPackageName = intent?.extras?.getString("socialAppPackageName").orEmpty()
+        assert(socialAppPackageName.isNotEmpty())
+
+        val socialAppIntent = packageManager.getLaunchIntentForPackage(socialAppPackageName)
+        if (socialAppIntent == null) {
+            val message = resources.getString(R.string.X_was_not_found_on_your_device, socialAppName)
             Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            finish()
             return
         }
 
         AsyncTask.execute {
             val question: String
-            val questionConnection = openConnection("/question?app_name=${socialApp.name}")
+            val questionConnection = openConnection("/question?app_name=$socialAppName")
             try {
                 if (questionConnection.responseCode != HTTP_OK) {
                     throw ConnectException("response code ${questionConnection.responseCode}")
@@ -95,8 +112,9 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     Toast.makeText(this, "server unreachable, starting app...", Toast.LENGTH_SHORT).show()
                 }
-                startActivity(intent)
+                startActivity(socialAppIntent)
                 Log.d("aaaaaa", "could not request question: ${exception.message.orEmpty()}")
+                finish()
                 return@execute
             } finally {
                 questionConnection.disconnect()
@@ -109,18 +127,17 @@ class MainActivity : AppCompatActivity() {
                 val answerRecordAudioButton = linearLayout.findViewById<Button>(R.id.answer_record_audio_button)
                 var mediaRecorder: MediaRecorder? = null
                 answerRecordAudioButton.setOnClickListener {
-                    val valMediaRecorder = mediaRecorder
                     when {
                         answerRecordAudioButton.text == getString(R.string.delete_recording) -> {
-                            answerAudioFile.delete()
+                            getAnswerAudioFile().delete()
                             answerRecordAudioButton.text = getString(R.string.start_recording)
                         }
-                        valMediaRecorder == null -> {
+                        mediaRecorder == null -> {
                             mediaRecorder = startAudioRecording()
                             answerRecordAudioButton.text = getString(R.string.stop_recording)
                         }
                         else -> {
-                            valMediaRecorder.apply {
+                            mediaRecorder?.apply {
                                 stop()
                                 release()
                             }
@@ -135,32 +152,32 @@ class MainActivity : AppCompatActivity() {
                     setView(linearLayout)
                     setNegativeButton(android.R.string.cancel) { _, _ -> }
                     setPositiveButton(android.R.string.ok) { _, _ ->
-                        val valMediaRecorder = mediaRecorder
-                        if (valMediaRecorder != null) {
-                            valMediaRecorder.apply {
-                                stop()
-                                release()
-                            }
-                            answerAudioFile.delete()
+                        mediaRecorder?.apply {
+                            stop()
+                            release()
                         }
 
-                        sendAnswer(userId, socialApp.name, question, answerEditText.text.toString())
-                        startActivity(intent)
+                        sendAnswer(socialAppName, question, answerEditText.text.toString())
+                        startActivity(socialAppIntent)
                     }
                     create()
                     show()
                 }
             }
         }
+
+        finish()
     }
 
-    private fun sendAnswer(userId: String, appName: String, question: String, answerText: String) {
+    private fun sendAnswer(appName: String, question: String, answerText: String) {
         var answerAudioUuid = "null"
 
-        if (answerAudioFile.exists()) {
-            answerAudioUuid = UUID.randomUUID().toString()
-            postToServer(answerAudioFile.readBytes(), "/audio?uuid=$answerAudioUuid")
-            answerAudioFile.delete()
+        getAnswerAudioFile().let {
+            if (it.exists()) {
+                answerAudioUuid = UUID.randomUUID().toString()
+                postToServer(it.readBytes(), "/audio?uuid=$answerAudioUuid")
+                it.delete()
+            }
         }
 
         postToServer(JSONObject("""{
@@ -172,11 +189,15 @@ class MainActivity : AppCompatActivity() {
         }""").toString().toByteArray(), "/answer")
     }
 
+    private fun getAnswerAudioFile(): File {
+        return cacheDir.resolve("social_gateway_answer_audio.aac")
+    }
+
     private fun startAudioRecording() : MediaRecorder {
         return MediaRecorder().apply {
             setAudioSource(MediaRecorder.AudioSource.MIC)
             setOutputFormat(MediaRecorder.OutputFormat.AAC_ADTS)
-            setOutputFile(answerAudioFile.absolutePath)
+            setOutputFile(getAnswerAudioFile().absolutePath)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
             prepare()
             start()
@@ -195,13 +216,16 @@ class MainActivity : AppCompatActivity() {
 class MyAppWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         appWidgetIds.forEach { appWidgetId ->
-            val pendingIntent = Intent(context, MainActivity::class.java).let { intent ->
-                PendingIntent.getActivity(context, 0, intent, 0)
+            val pendingIntent = Intent(context, QuestionBeforeLaunchActivity::class.java).let {
+//                it.putExtra("socialAppName", socialApp.name)
+//                it.putExtra("socialAppPackageName", socialApp.packageName)
+                return@let PendingIntent.getActivity(context, 0, it, 0)
             }
-            val views = RemoteViews(context.packageName, R.layout.widget_telegram).apply {
-                setOnClickPendingIntent(R.id.telegram_widget_button, pendingIntent)
+
+            RemoteViews(context.packageName, R.layout.widget_telegram).let {
+                it.setOnClickPendingIntent(R.id.telegram_widget_button, pendingIntent)
+                appWidgetManager.updateAppWidget(appWidgetId, it)
             }
-            appWidgetManager.updateAppWidget(appWidgetId, views)
         }
     }
 }

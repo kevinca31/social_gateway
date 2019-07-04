@@ -5,7 +5,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-
     <application
             android:allowBackup="true"
             android:icon="@mipmap/ic_launcher"
@@ -21,16 +20,14 @@
             </intent-filter>
         </activity>
 
-        <receiver android:name="MyAppWidgetProvider" >
+        <activity android:name=".QuestionBeforeLaunchActivity"/>
+
+        <receiver android:name="MyAppWidgetProvider">
             <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
             </intent-filter>
             <meta-data android:name="android.appwidget.provider"
-                       android:resource="@xml/appwidget_info_telegram" />
+                       android:resource="@xml/appwidget_info_telegram"/>
         </receiver>
     </application>
-
-
-
-
 </manifest>
