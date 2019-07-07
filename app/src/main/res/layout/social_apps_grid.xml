@@ -2,22 +2,9 @@
 <GridLayout
         xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:tools="http://schemas.android.com/tools"
+        android:id="@+id/social_apps_grid"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:useDefaultMargins="true"
         android:layout_margin="20dp"
-        tools:context=".MainActivity">
-
-    <android.support.v7.widget.AppCompatImageView
-            android:id="@+id/whats_app_button"
-            android:layout_width="100dp"
-            android:layout_height="100dp"
-            android:src="@drawable/whatsapp"/>
-
-    <android.support.v7.widget.AppCompatImageView
-            android:id="@+id/telegram_button"
-            android:layout_width="100dp"
-            android:layout_height="100dp"
-            android:src="@drawable/telegram"/>
-
-</GridLayout>
+        android:columnCount="3"
+        tools:context=".MainActivity"/>

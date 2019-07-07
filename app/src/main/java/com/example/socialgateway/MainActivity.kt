@@ -1,5 +1,6 @@
 package com.example.socialgateway
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.PendingIntent
@@ -7,11 +8,17 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.res.Resources
 import android.media.MediaRecorder
 import android.os.AsyncTask
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
+import android.util.DisplayMetrics
 import android.util.Log
+import android.util.TypedValue
+import android.view.View
+import android.view.ViewGroup
 import android.widget.*
 import org.json.JSONObject
 import java.io.File
@@ -20,19 +27,25 @@ import java.net.HttpURLConnection
 import java.net.HttpURLConnection.HTTP_OK
 import java.net.URL
 import java.util.*
+import kotlin.math.roundToInt
 
-val tag = "SocialGateway"
+fun log(message: String) {
+    Log.d("SocialGateway", message)
+}
 
 data class SocialApp(
     val name: String,
     val packageName: String,
-    val buttonId: Int,
     val imageId: Int)
 
 val socialApps = listOf(
-    SocialApp("Telegram", "org.telegram.messenger", R.id.telegram_button, R.drawable.telegram),
-    SocialApp("WhatsApp", "com.whatsapp", R.id.whats_app_button, R.drawable.whatsapp)
-)
+    SocialApp("Telegram", "org.telegram.messenger", R.drawable.telegram),
+    SocialApp("WhatsApp", "com.whatsapp", R.drawable.whatsapp),
+    SocialApp("Facebook", "com.facebook.katana", R.drawable.facebook),
+    SocialApp("Facebook Messenger", "com.facebook.orca", R.drawable.facebook_messenger),
+    SocialApp("Instagram", "com.instagram.android", R.drawable.instagram),
+    SocialApp("Signal", "org.thoughtcrime.securesms", R.drawable.signal),
+    SocialApp("Snapchat", "com.snapchat.android", R.drawable.snapchat))
 
 fun openConnection(route: String): HttpURLConnection {
     return URL("http://192.168.178.30:5000$route").openConnection() as HttpURLConnection
@@ -49,11 +62,30 @@ fun postToServer(data: ByteArray, route: String) {
                 throw ConnectException("response code ${answerConnection.responseCode}")
             }
         } catch (exception: ConnectException) {
-            Log.d(tag, "could not send answer: ${exception.message.orEmpty()}")
+            log("could not send answer: ${exception.message.orEmpty()}")
         } finally {
             answerConnection.disconnect()
         }
     }
+}
+
+fun dp(value: Float, resources: Resources): Int {
+    return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, resources.displayMetrics).roundToInt()
+}
+
+fun initSocialAppInGrid(socialAppsGrid: GridLayout, context: Context, socialApp: SocialApp, onClickListener: () -> Unit) {
+    socialAppsGrid.addView(ImageView(context).apply {
+        layoutParams = GridLayout.LayoutParams().apply {
+            width = dp(90f, resources)
+            height = dp(90f, resources)
+            rightMargin = dp(20f, resources)
+            bottomMargin = dp(20f, resources)
+        }
+
+        setImageResource(socialApp.imageId)
+
+        setOnClickListener { onClickListener() }
+    })
 }
 
 class MainActivity : AppCompatActivity() {
@@ -62,8 +94,9 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.social_apps_grid)
 
+        val socialAppsGrid = findViewById<GridLayout>(R.id.social_apps_grid)
         socialApps.forEach { socialApp ->
-            findViewById<ImageView>(socialApp.buttonId).setOnClickListener {
+            initSocialAppInGrid(socialAppsGrid, this, socialApp) {
                 startActivity(Intent(this, QuestionBeforeLaunchActivity::class.java).apply {
                     putExtra("socialAppName", socialApp.name)
                     putExtra("socialAppPackageName", socialApp.packageName)
@@ -77,6 +110,7 @@ class QuestionBeforeLaunchActivity : AppCompatActivity() {
 
     private lateinit var userId: String
 
+    @SuppressLint("InflateParams")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -88,13 +122,13 @@ class QuestionBeforeLaunchActivity : AppCompatActivity() {
         val socialAppName = intent?.extras?.getString("socialAppName").orEmpty()
 
         if (socialAppName.isEmpty()) {
-            Log.e(tag, "socialAppName must not be empty")
+            log("socialAppName must not be empty")
             return
         }
 
         val socialAppPackageName = intent?.extras?.getString("socialAppPackageName").orEmpty()
         if (socialAppPackageName.isEmpty()) {
-            Log.e(tag, "socialAppPackageName must not be empty")
+            log("socialAppPackageName must not be empty")
             return
         }
 
@@ -120,7 +154,7 @@ class QuestionBeforeLaunchActivity : AppCompatActivity() {
                     Toast.makeText(this, "server unreachable, starting app...", Toast.LENGTH_SHORT).show()
                 }
                 startActivity(socialAppIntent)
-                Log.d(tag, "could not request question: ${exception.message.orEmpty()}")
+                log("could not request question: ${exception.message.orEmpty()}")
                 finish()
                 return@execute
             } finally {
@@ -258,12 +292,14 @@ class WidgetConfiguratorActivity : AppCompatActivity() {
         val appWidgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID,
             AppWidgetManager.INVALID_APPWIDGET_ID) ?: AppWidgetManager.INVALID_APPWIDGET_ID
 
+        val socialAppsGrid = findViewById<GridLayout>(R.id.social_apps_grid)
         socialApps.forEach { socialApp ->
-            findViewById<ImageView>(socialApp.buttonId).setOnClickListener {
+            initSocialAppInGrid(socialAppsGrid, this, socialApp) {
                 appWidgetIdToSocialApp[appWidgetId] = socialApp
 
-                val appWidgetManager = AppWidgetManager.getInstance(this)
-                MyAppWidgetProvider.updateAppWidget(this, appWidgetManager, appWidgetId)
+                AppWidgetManager.getInstance(this).let {
+                    MyAppWidgetProvider.updateAppWidget(this, it, appWidgetId)
+                }
 
                 setResult(Activity.RESULT_OK, Intent().apply {
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
