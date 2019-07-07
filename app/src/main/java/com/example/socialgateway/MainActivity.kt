@@ -21,10 +21,18 @@ import java.net.HttpURLConnection.HTTP_OK
 import java.net.URL
 import java.util.*
 
+val tag = "SocialGateway"
+
 data class SocialApp(
     val name: String,
     val packageName: String,
-    val buttonId: Int)
+    val buttonId: Int,
+    val imageId: Int)
+
+val socialApps = listOf(
+    SocialApp("Telegram", "org.telegram.messenger", R.id.telegram_button, R.drawable.telegram),
+    SocialApp("WhatsApp", "com.whatsapp", R.id.whats_app_button, R.drawable.whatsapp)
+)
 
 fun openConnection(route: String): HttpURLConnection {
     return URL("http://192.168.178.30:5000$route").openConnection() as HttpURLConnection
@@ -41,7 +49,7 @@ fun postToServer(data: ByteArray, route: String) {
                 throw ConnectException("response code ${answerConnection.responseCode}")
             }
         } catch (exception: ConnectException) {
-            Log.d("aaaaaa", "could not send answer: ${exception.message.orEmpty()}")
+            Log.d(tag, "could not send answer: ${exception.message.orEmpty()}")
         } finally {
             answerConnection.disconnect()
         }
@@ -52,14 +60,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        setContentView(R.layout.social_apps_grid)
 
-        val socialApps = listOf(
-            SocialApp(resources.getString(R.string.whats_app), "com.whatsapp", R.id.whats_app_button),
-            SocialApp(resources.getString(R.string.telegram), "org.telegram.messenger", R.id.telegram_button))
         socialApps.forEach { socialApp ->
-            val button = findViewById<ImageView>(socialApp.buttonId)
-            button.setOnClickListener {
+            findViewById<ImageView>(socialApp.buttonId).setOnClickListener {
                 startActivity(Intent(this, QuestionBeforeLaunchActivity::class.java).apply {
                     putExtra("socialAppName", socialApp.name)
                     putExtra("socialAppPackageName", socialApp.packageName)
@@ -76,21 +80,23 @@ class QuestionBeforeLaunchActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // TODO check userId is always the same
         userId = getPreferences(Context.MODE_PRIVATE).getString("userId", "").orEmpty().ifEmpty {
             UUID.randomUUID().toString()
         }
 
         val socialAppName = intent?.extras?.getString("socialAppName").orEmpty()
 
-        //TODO
-        assert(socialAppName.isNotEmpty())
         if (socialAppName.isEmpty()) {
-            Log.d("aaaaaa", "socialAppName must not be empty")
-            throw Error("socialAppName must not be empty")
+            Log.e(tag, "socialAppName must not be empty")
+            return
         }
 
         val socialAppPackageName = intent?.extras?.getString("socialAppPackageName").orEmpty()
-        assert(socialAppPackageName.isNotEmpty())
+        if (socialAppPackageName.isEmpty()) {
+            Log.e(tag, "socialAppPackageName must not be empty")
+            return
+        }
 
         val socialAppIntent = packageManager.getLaunchIntentForPackage(socialAppPackageName)
         if (socialAppIntent == null) {
@@ -114,7 +120,7 @@ class QuestionBeforeLaunchActivity : AppCompatActivity() {
                     Toast.makeText(this, "server unreachable, starting app...", Toast.LENGTH_SHORT).show()
                 }
                 startActivity(socialAppIntent)
-                Log.d("aaaaaa", "could not request question: ${exception.message.orEmpty()}")
+                Log.d(tag, "could not request question: ${exception.message.orEmpty()}")
                 finish()
                 return@execute
             } finally {
@@ -214,23 +220,30 @@ class QuestionBeforeLaunchActivity : AppCompatActivity() {
     }
 }
 
+val appWidgetIdToSocialApp = mutableMapOf<Int, SocialApp>()
+
 class MyAppWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         appWidgetIds.forEach { appWidgetId ->
+            updateAppWidget(context, appWidgetManager, appWidgetId)
+        }
+    }
+
+    companion object {
+        fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
+            val socialApp = appWidgetIdToSocialApp[appWidgetId] ?: return
+
             val pendingIntent = Intent(context, QuestionBeforeLaunchActivity::class.java).let {
-                // TODO get values from intent
-                it.putExtra("socialAppName", context.resources.getString(R.string.telegram))
-                it.putExtra("socialAppPackageName", "org.telegram.messenger")
-                return@let PendingIntent.getActivity(context, 0, it, 0)
+                it.putExtra("socialAppName", socialApp.name)
+                it.putExtra("socialAppPackageName", socialApp.packageName)
+
+                PendingIntent.getActivity(context, appWidgetId, it, 0)
             }
 
-//            RemoteViews(context.packageName, R.layout.widget_telegram).let {
-//                it.setOnClickPendingIntent(R.id.telegram_widget_button, pendingIntent)
-//                appWidgetManager.updateAppWidget(appWidgetId, it)
-//            }
-
             RemoteViews(context.packageName, R.layout.widget).let {
+                it.setImageViewResource(R.id.widget_button, socialApp.imageId)
                 it.setOnClickPendingIntent(R.id.widget_button, pendingIntent)
+
                 appWidgetManager.updateAppWidget(appWidgetId, it)
             }
         }
@@ -240,24 +253,24 @@ class MyAppWidgetProvider : AppWidgetProvider() {
 class WidgetConfiguratorActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(R.layout.social_apps_grid)
 
         val appWidgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID,
             AppWidgetManager.INVALID_APPWIDGET_ID) ?: AppWidgetManager.INVALID_APPWIDGET_ID
 
-        // TODO configure
-        val socialAppName = resources.getString(R.string.telegram)
-        val socialAppPackageName = "org.telegram.messenger"
+        socialApps.forEach { socialApp ->
+            findViewById<ImageView>(socialApp.buttonId).setOnClickListener {
+                appWidgetIdToSocialApp[appWidgetId] = socialApp
 
-        val appWidgetManager: AppWidgetManager = AppWidgetManager.getInstance(this)
+                val appWidgetManager = AppWidgetManager.getInstance(this)
+                MyAppWidgetProvider.updateAppWidget(this, appWidgetManager, appWidgetId)
 
-        appWidgetManager.updateAppWidget(appWidgetId, RemoteViews(packageName, R.layout.widget))
+                setResult(Activity.RESULT_OK, Intent().apply {
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                })
 
-        val resultValue = Intent().apply {
-            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-            putExtra("socialAppName", socialAppName)
-            putExtra("socialAppPackageName", socialAppPackageName)
+                finish()
+            }
         }
-        setResult(Activity.RESULT_OK, resultValue)
-        finish()
     }
 }
