@@ -47,28 +47,6 @@ val socialApps = listOf(
     SocialApp("Signal", "org.thoughtcrime.securesms", R.drawable.signal),
     SocialApp("Snapchat", "com.snapchat.android", R.drawable.snapchat))
 
-fun openConnection(route: String): HttpURLConnection {
-    return URL("http://192.168.178.30:5000$route").openConnection() as HttpURLConnection
-}
-
-fun postToServer(data: ByteArray, route: String) {
-    AsyncTask.execute {
-        val answerConnection = openConnection(route)
-        try {
-            answerConnection.requestMethod = "POST"
-            answerConnection.doOutput = true
-            answerConnection.outputStream.write(data)
-            if (answerConnection.responseCode != HTTP_OK) {
-                throw ConnectException("response code ${answerConnection.responseCode}")
-            }
-        } catch (exception: ConnectException) {
-            log("could not send answer: ${exception.message.orEmpty()}")
-        } finally {
-            answerConnection.disconnect()
-        }
-    }
-}
-
 fun dp(value: Float, resources: Resources): Int {
     return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, resources.displayMetrics).roundToInt()
 }
@@ -109,6 +87,30 @@ class MainActivity : AppCompatActivity() {
 class QuestionBeforeLaunchActivity : AppCompatActivity() {
 
     private lateinit var userId: String
+    private lateinit var serverUrl: String
+
+    private fun openConnection(route: String): HttpURLConnection {
+        log(serverUrl)
+        return URL("$serverUrl$route").openConnection() as HttpURLConnection
+    }
+
+    private fun postToServer(data: ByteArray, route: String) {
+        AsyncTask.execute {
+            val answerConnection = openConnection(route)
+            try {
+                answerConnection.requestMethod = "POST"
+                answerConnection.doOutput = true
+                answerConnection.outputStream.write(data)
+                if (answerConnection.responseCode != HTTP_OK) {
+                    throw ConnectException("response code ${answerConnection.responseCode}")
+                }
+            } catch (exception: ConnectException) {
+                log("could not send answer: ${exception.message.orEmpty()}")
+            } finally {
+                answerConnection.disconnect()
+            }
+        }
+    }
 
     @SuppressLint("InflateParams")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -117,6 +119,24 @@ class QuestionBeforeLaunchActivity : AppCompatActivity() {
         // TODO check userId is always the same
         userId = getPreferences(Context.MODE_PRIVATE).getString("userId", "").orEmpty().ifEmpty {
             UUID.randomUUID().toString()
+        }
+
+        serverUrl = getPreferences(Context.MODE_PRIVATE).getString("serverUrl", "").orEmpty().ifEmpty {
+            val linearLayout = layoutInflater.inflate(R.layout.answer_dialog, null)
+            val answerEditText = linearLayout.findViewById<EditText>(R.id.answer_edit_text)
+
+            AlertDialog.Builder(this).apply {
+                setTitle("enter server url")
+                setView(linearLayout)
+                setNegativeButton(android.R.string.cancel) { _, _ -> }
+                setPositiveButton(android.R.string.ok) { _, _ ->
+                    serverUrl = answerEditText.text.toString()
+                }
+                create()
+                show()
+            }
+
+            "http://192.168.178.30:5000"
         }
 
         val socialAppName = intent?.extras?.getString("socialAppName").orEmpty()
@@ -249,6 +269,7 @@ class QuestionBeforeLaunchActivity : AppCompatActivity() {
         super.onPause()
         getPreferences(Context.MODE_PRIVATE).edit().apply {
             putString("userId", userId)
+            putString("serverUrl", serverUrl)
             apply()
         }
     }
