@@ -68,30 +68,10 @@ fun initSocialAppInGrid(socialAppsGrid: GridLayout, context: Context, socialApp:
 
 class MainActivity : AppCompatActivity() {
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.social_apps_grid)
-
-        val socialAppsGrid = findViewById<GridLayout>(R.id.social_apps_grid)
-        socialApps.forEach { socialApp ->
-            initSocialAppInGrid(socialAppsGrid, this, socialApp) {
-                startActivity(Intent(this, QuestionBeforeLaunchActivity::class.java).apply {
-                    putExtra("socialAppName", socialApp.name)
-                    putExtra("socialAppPackageName", socialApp.packageName)
-                })
-            }
-        }
-    }
-}
-
-class QuestionBeforeLaunchActivity : AppCompatActivity() {
-
     private lateinit var userId: String
-    private lateinit var serverUrl: String
 
     private fun openConnection(route: String): HttpURLConnection {
-        log(serverUrl)
-        return URL("$serverUrl$route").openConnection() as HttpURLConnection
+        return URL("http://192.168.178.30:5000$route").openConnection() as HttpURLConnection
     }
 
     private fun postToServer(data: ByteArray, route: String) {
@@ -112,50 +92,42 @@ class QuestionBeforeLaunchActivity : AppCompatActivity() {
         }
     }
 
-    @SuppressLint("InflateParams")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(R.layout.social_apps_grid)
 
-        // TODO check userId is always the same
+        val context = this
+        val socialAppsGrid = findViewById<GridLayout>(R.id.social_apps_grid)
+
         userId = getPreferences(Context.MODE_PRIVATE).getString("userId", "").orEmpty().ifEmpty {
+            log("WARNING: generating new userId")
             UUID.randomUUID().toString()
         }
+        log("userId: $userId")
 
-        serverUrl = getPreferences(Context.MODE_PRIVATE).getString("serverUrl", "").orEmpty().ifEmpty {
-            val linearLayout = layoutInflater.inflate(R.layout.answer_dialog, null)
-            val answerEditText = linearLayout.findViewById<EditText>(R.id.answer_edit_text)
-
-            AlertDialog.Builder(this).apply {
-                setTitle("enter server url")
-                setView(linearLayout)
-                setNegativeButton(android.R.string.cancel) { _, _ -> }
-                setPositiveButton(android.R.string.ok) { _, _ ->
-                    serverUrl = answerEditText.text.toString()
-                }
-                create()
-                show()
-            }
-
-            "http://192.168.178.30:5000"
-        }
-
+        // these are set when started via widget
         val socialAppName = intent?.extras?.getString("socialAppName").orEmpty()
+        val socialAppPackageName = intent?.extras?.getString("socialAppPackageName").orEmpty()
 
-        if (socialAppName.isEmpty()) {
-            log("socialAppName must not be empty")
-            return
+
+        socialApps.forEach { socialApp ->
+            initSocialAppInGrid(socialAppsGrid, context, socialApp) {
+                startActivity(Intent(context, MainActivity::class.java).apply {
+                    putExtra("socialAppName", socialApp.name)
+                    putExtra("socialAppPackageName", socialApp.packageName)
+                })
+            }
         }
 
-        val socialAppPackageName = intent?.extras?.getString("socialAppPackageName").orEmpty()
-        if (socialAppPackageName.isEmpty()) {
-            log("socialAppPackageName must not be empty")
+        if (socialAppName.isEmpty() or socialAppPackageName.isEmpty()) {
+            // started directly, not via widget
             return
         }
 
         val socialAppIntent = packageManager.getLaunchIntentForPackage(socialAppPackageName)
         if (socialAppIntent == null) {
             val message = resources.getString(R.string.X_was_not_found_on_your_device, socialAppName)
-            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
             finish()
             return
         }
@@ -171,7 +143,7 @@ class QuestionBeforeLaunchActivity : AppCompatActivity() {
                 question = questionConnection.inputStream.reader().readText()
             } catch (exception: ConnectException) {
                 runOnUiThread {
-                    Toast.makeText(this, "server unreachable, starting app...", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "server unreachable, starting app...", Toast.LENGTH_SHORT).show()
                 }
                 startActivity(socialAppIntent)
                 log("could not request question: ${exception.message.orEmpty()}")
@@ -208,7 +180,7 @@ class QuestionBeforeLaunchActivity : AppCompatActivity() {
                     }
                 }
 
-                AlertDialog.Builder(this).apply {
+                AlertDialog.Builder(context).apply {
                     setTitle(question)
                     setView(linearLayout)
                     setNegativeButton(android.R.string.cancel) { _, _ -> }
@@ -226,8 +198,6 @@ class QuestionBeforeLaunchActivity : AppCompatActivity() {
                 }
             }
         }
-
-        finish()
     }
 
     private fun sendAnswer(appName: String, question: String, answerText: String) {
@@ -269,7 +239,6 @@ class QuestionBeforeLaunchActivity : AppCompatActivity() {
         super.onPause()
         getPreferences(Context.MODE_PRIVATE).edit().apply {
             putString("userId", userId)
-            putString("serverUrl", serverUrl)
             apply()
         }
     }
@@ -288,7 +257,7 @@ class MyAppWidgetProvider : AppWidgetProvider() {
         fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
             val socialApp = appWidgetIdToSocialApp[appWidgetId] ?: return
 
-            val pendingIntent = Intent(context, QuestionBeforeLaunchActivity::class.java).let {
+            val pendingIntent = Intent(context, MainActivity::class.java).let {
                 it.putExtra("socialAppName", socialApp.name)
                 it.putExtra("socialAppPackageName", socialApp.packageName)
 
@@ -310,16 +279,18 @@ class WidgetConfiguratorActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.social_apps_grid)
 
+        val context = this
+
         val appWidgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID,
             AppWidgetManager.INVALID_APPWIDGET_ID) ?: AppWidgetManager.INVALID_APPWIDGET_ID
 
         val socialAppsGrid = findViewById<GridLayout>(R.id.social_apps_grid)
         socialApps.forEach { socialApp ->
-            initSocialAppInGrid(socialAppsGrid, this, socialApp) {
+            initSocialAppInGrid(socialAppsGrid, context, socialApp) {
                 appWidgetIdToSocialApp[appWidgetId] = socialApp
 
-                AppWidgetManager.getInstance(this).let {
-                    MyAppWidgetProvider.updateAppWidget(this, it, appWidgetId)
+                AppWidgetManager.getInstance(context).let {
+                    MyAppWidgetProvider.updateAppWidget(context, it, appWidgetId)
                 }
 
                 setResult(Activity.RESULT_OK, Intent().apply {

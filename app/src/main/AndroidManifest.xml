@@ -20,7 +20,6 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".QuestionBeforeLaunchActivity"/>
         <activity android:name=".WidgetConfiguratorActivity">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE"/>
