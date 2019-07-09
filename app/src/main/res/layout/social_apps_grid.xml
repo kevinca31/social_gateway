@@ -1,10 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<GridLayout
+<RelativeLayout
         xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:tools="http://schemas.android.com/tools"
-        android:id="@+id/social_apps_grid"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_margin="20dp"
-        android:columnCount="3"
-        tools:context=".MainActivity"/>
+        tools:context=".MainActivity">
+    <GridView
+            android:id="@+id/social_apps_grid"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="20dp"
+            android:columnWidth="80dp"
+            android:numColumns="auto_fit"
+            android:horizontalSpacing="20dp"
+            android:verticalSpacing="20dp"
+            android:stretchMode="columnWidth"/>
+</RelativeLayout>

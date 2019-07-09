@@ -1,6 +1,5 @@
 package com.example.socialgateway
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.PendingIntent
@@ -8,13 +7,11 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.media.MediaRecorder
 import android.os.AsyncTask
-import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
-import android.util.DisplayMetrics
+import android.support.v7.app.AppCompatActivity
 import android.util.Log
 import android.util.TypedValue
 import android.view.View
@@ -51,20 +48,33 @@ fun dp(value: Float, resources: Resources): Int {
     return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, resources.displayMetrics).roundToInt()
 }
 
-fun initSocialAppInGrid(socialAppsGrid: GridLayout, context: Context, socialApp: SocialApp, onClickListener: () -> Unit) {
-    socialAppsGrid.addView(ImageView(context).apply {
-        layoutParams = GridLayout.LayoutParams().apply {
-            width = dp(90f, resources)
-            height = dp(90f, resources)
-            rightMargin = dp(20f, resources)
-            bottomMargin = dp(20f, resources)
+
+class SocialAppAdapter(private val context: Context, private val onClick: (Context, SocialApp) -> Unit)
+        : BaseAdapter() {
+    override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
+        val socialApp = socialApps[position]
+        val imageView = convertView as? ImageView ?: ImageView(context)
+
+        return imageView.apply {
+            setImageResource(socialApp.imageId)
+            adjustViewBounds = true
+            setOnClickListener { onClick(context, socialApp) }
         }
+    }
 
-        setImageResource(socialApp.imageId)
+    override fun getItem(position: Int): Any {
+        return socialApps[position]
+    }
 
-        setOnClickListener { onClickListener() }
-    })
+    override fun getItemId(position: Int): Long {
+        return position.toLong()
+    }
+
+    override fun getCount(): Int {
+        return socialApps.size
+    }
 }
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -96,9 +106,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.social_apps_grid)
 
-        val context = this
-        val socialAppsGrid = findViewById<GridLayout>(R.id.social_apps_grid)
-
         userId = getPreferences(Context.MODE_PRIVATE).getString("userId", "").orEmpty().ifEmpty {
             log("WARNING: generating new userId")
             UUID.randomUUID().toString()
@@ -109,14 +116,13 @@ class MainActivity : AppCompatActivity() {
         val socialAppName = intent?.extras?.getString("socialAppName").orEmpty()
         val socialAppPackageName = intent?.extras?.getString("socialAppPackageName").orEmpty()
 
+        val mainActivity = this
 
-        socialApps.forEach { socialApp ->
-            initSocialAppInGrid(socialAppsGrid, context, socialApp) {
-                startActivity(Intent(context, MainActivity::class.java).apply {
-                    putExtra("socialAppName", socialApp.name)
-                    putExtra("socialAppPackageName", socialApp.packageName)
-                })
-            }
+        findViewById<GridView>(R.id.social_apps_grid).adapter = SocialAppAdapter(mainActivity) { context, socialApp ->
+            startActivity(Intent(context, MainActivity::class.java).apply {
+                putExtra("socialAppName", socialApp.name)
+                putExtra("socialAppPackageName", socialApp.packageName)
+            })
         }
 
         if (socialAppName.isEmpty() or socialAppPackageName.isEmpty()) {
@@ -127,7 +133,7 @@ class MainActivity : AppCompatActivity() {
         val socialAppIntent = packageManager.getLaunchIntentForPackage(socialAppPackageName)
         if (socialAppIntent == null) {
             val message = resources.getString(R.string.X_was_not_found_on_your_device, socialAppName)
-            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            Toast.makeText(mainActivity, message, Toast.LENGTH_LONG).show()
             finish()
             return
         }
@@ -143,7 +149,7 @@ class MainActivity : AppCompatActivity() {
                 question = questionConnection.inputStream.reader().readText()
             } catch (exception: ConnectException) {
                 runOnUiThread {
-                    Toast.makeText(context, "server unreachable, starting app...", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(mainActivity, "server unreachable, starting app...", Toast.LENGTH_SHORT).show()
                 }
                 startActivity(socialAppIntent)
                 log("could not request question: ${exception.message.orEmpty()}")
@@ -180,7 +186,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                AlertDialog.Builder(context).apply {
+                AlertDialog.Builder(mainActivity).apply {
                     setTitle(question)
                     setView(linearLayout)
                     setNegativeButton(android.R.string.cancel) { _, _ -> }
@@ -279,26 +285,21 @@ class WidgetConfiguratorActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.social_apps_grid)
 
-        val context = this
-
         val appWidgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID,
             AppWidgetManager.INVALID_APPWIDGET_ID) ?: AppWidgetManager.INVALID_APPWIDGET_ID
 
-        val socialAppsGrid = findViewById<GridLayout>(R.id.social_apps_grid)
-        socialApps.forEach { socialApp ->
-            initSocialAppInGrid(socialAppsGrid, context, socialApp) {
-                appWidgetIdToSocialApp[appWidgetId] = socialApp
+        findViewById<GridView>(R.id.social_apps_grid).adapter = SocialAppAdapter(this) { context, socialApp ->
+            appWidgetIdToSocialApp[appWidgetId] = socialApp
 
-                AppWidgetManager.getInstance(context).let {
-                    MyAppWidgetProvider.updateAppWidget(context, it, appWidgetId)
-                }
-
-                setResult(Activity.RESULT_OK, Intent().apply {
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                })
-
-                finish()
+            AppWidgetManager.getInstance(context).let {
+                MyAppWidgetProvider.updateAppWidget(context, it, appWidgetId)
             }
+
+            setResult(Activity.RESULT_OK, Intent().apply {
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            })
+
+            finish()
         }
     }
 }
