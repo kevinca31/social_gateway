@@ -53,11 +53,12 @@ class SocialAppAdapter(private val context: Context, private val onClick: (Conte
         : BaseAdapter() {
     override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
         val socialApp = socialApps[position]
-        val imageView = convertView as? ImageView ?: ImageView(context)
+        val imageView = convertView as? ImageView ?:ImageView(context).apply {
+            adjustViewBounds = true
+        }
 
         return imageView.apply {
             setImageResource(socialApp.imageId)
-            adjustViewBounds = true
             setOnClickListener { onClick(context, socialApp) }
         }
     }
