@@ -23,6 +23,7 @@ import java.net.ConnectException
 import java.net.HttpURLConnection
 import java.net.HttpURLConnection.HTTP_OK
 import java.net.URL
+import java.net.URLEncoder
 import java.util.*
 import kotlin.math.roundToInt
 
@@ -82,7 +83,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var userId: String
 
     private fun openConnection(route: String): HttpURLConnection {
-        return URL("http://192.168.178.30:5000$route").openConnection() as HttpURLConnection
+        return URL("http://89.12.202.34:5000$route").openConnection() as HttpURLConnection
     }
 
     private fun postToServer(data: ByteArray, route: String) {
@@ -133,15 +134,18 @@ class MainActivity : AppCompatActivity() {
 
         val socialAppIntent = packageManager.getLaunchIntentForPackage(socialAppPackageName)
         if (socialAppIntent == null) {
-            val message = resources.getString(R.string.X_was_not_found_on_your_device, socialAppName)
-            Toast.makeText(mainActivity, message, Toast.LENGTH_LONG).show()
+            resources.getString(R.string.X_was_not_found_on_your_device, socialAppName).let {
+                Toast.makeText(mainActivity, it, Toast.LENGTH_LONG).show()
+            }
             finish()
             return
         }
 
+        Toast.makeText(mainActivity, "requesting question from server...", Toast.LENGTH_SHORT).show()
         AsyncTask.execute {
             val question: String
-            val questionConnection = openConnection("/question?app_name=$socialAppName")
+            val encodedAppName = URLEncoder.encode(socialAppName, "utf-8")
+            val questionConnection = openConnection("/question?app_name=$encodedAppName")
             try {
                 if (questionConnection.responseCode != HTTP_OK) {
                     throw ConnectException("response code ${questionConnection.responseCode}")
