@@ -7,13 +7,12 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
-import android.content.res.Resources
+import android.content.SharedPreferences
 import android.media.MediaRecorder
 import android.os.AsyncTask
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
 import android.util.Log
-import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
@@ -25,7 +24,6 @@ import java.net.HttpURLConnection.HTTP_OK
 import java.net.URL
 import java.net.URLEncoder
 import java.util.*
-import kotlin.math.roundToInt
 
 fun log(message: String) {
     Log.d("SocialGateway", message)
@@ -44,10 +42,6 @@ val socialApps = listOf(
     SocialApp("Instagram", "com.instagram.android", R.drawable.instagram),
     SocialApp("Signal", "org.thoughtcrime.securesms", R.drawable.signal),
     SocialApp("Snapchat", "com.snapchat.android", R.drawable.snapchat))
-
-fun dp(value: Float, resources: Resources): Int {
-    return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, resources.displayMetrics).roundToInt()
-}
 
 
 class SocialAppAdapter(private val context: Context, private val onClick: (Context, SocialApp) -> Unit)
@@ -81,25 +75,27 @@ class SocialAppAdapter(private val context: Context, private val onClick: (Conte
 class MainActivity : AppCompatActivity() {
 
     private lateinit var userId: String
+    private lateinit var preferences: SharedPreferences
 
     private fun openConnection(route: String): HttpURLConnection {
-        return URL("http://89.12.202.34:5000$route").openConnection() as HttpURLConnection
+        return URL("http://192.168.178.23:5000$route").openConnection() as HttpURLConnection
     }
 
     private fun postToServer(data: ByteArray, route: String) {
         AsyncTask.execute {
-            val answerConnection = openConnection(route)
-            try {
-                answerConnection.requestMethod = "POST"
-                answerConnection.doOutput = true
-                answerConnection.outputStream.write(data)
-                if (answerConnection.responseCode != HTTP_OK) {
-                    throw ConnectException("response code ${answerConnection.responseCode}")
+            openConnection(route).apply {
+                try {
+                    requestMethod = "POST"
+                    doOutput = true
+                    outputStream.write(data)
+                    if (responseCode != HTTP_OK) {
+                        throw ConnectException("response code $responseCode")
+                    }
+                } catch (exception: ConnectException) {
+                    log("could not send answer: ${exception.message.orEmpty()}")
+                } finally {
+                    disconnect()
                 }
-            } catch (exception: ConnectException) {
-                log("could not send answer: ${exception.message.orEmpty()}")
-            } finally {
-                answerConnection.disconnect()
             }
         }
     }
@@ -108,15 +104,13 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.social_apps_grid)
 
-        userId = getPreferences(Context.MODE_PRIVATE).getString("userId", "").orEmpty().ifEmpty {
-            log("WARNING: generating new userId")
+        preferences = getPreferences(Context.MODE_PRIVATE)
+
+        userId = preferences.getString("userId", "").ifEmpty {
+            log("generating new userId")
             UUID.randomUUID().toString()
         }
         log("userId: $userId")
-
-        // these are set when started via widget
-        val socialAppName = intent?.extras?.getString("socialAppName").orEmpty()
-        val socialAppPackageName = intent?.extras?.getString("socialAppPackageName").orEmpty()
 
         val mainActivity = this
 
@@ -127,16 +121,27 @@ class MainActivity : AppCompatActivity() {
             })
         }
 
-        if (socialAppName.isEmpty() or socialAppPackageName.isEmpty()) {
-            // started directly, not via widget
-            return
-        }
+        // these are only set when started via widget
+        val socialAppName = intent?.extras?.getString("socialAppName").orEmpty()
+        val socialAppPackageName = intent?.extras?.getString("socialAppPackageName").orEmpty()
+
+        // nothing else to do if started directly (not via widget)
+        socialAppName.ifEmpty { return }
+        socialAppPackageName.ifEmpty { return }
 
         val socialAppIntent = packageManager.getLaunchIntentForPackage(socialAppPackageName)
         if (socialAppIntent == null) {
             resources.getString(R.string.X_was_not_found_on_your_device, socialAppName).let {
                 Toast.makeText(mainActivity, it, Toast.LENGTH_LONG).show()
             }
+            finish()
+            return
+        }
+
+        if (System.currentTimeMillis() - preferences.getLong(socialAppName, 0) < 86400000) {
+            // last question for this app was asked less than 24 hours ago
+            startActivity(socialAppIntent)
+            log("already answered question today")
             finish()
             return
         }
@@ -203,6 +208,12 @@ class MainActivity : AppCompatActivity() {
 
                         sendAnswer(socialAppName, question, answerEditText.text.toString())
                         startActivity(socialAppIntent)
+
+                        // received question and sent answer -> no more questions for this app in the next 24 hours
+                        preferences.edit().apply {
+                            putLong(socialAppName, System.currentTimeMillis())
+                            apply()
+                        }
                     }
                     create()
                     show()
@@ -248,7 +259,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        getPreferences(Context.MODE_PRIVATE).edit().apply {
+        preferences.edit().apply {
             putString("userId", userId)
             apply()
         }
