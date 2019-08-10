@@ -10,4 +10,7 @@
     <string name="stop_recording">stop recording</string>
     <string name="delete_recording">delete recording</string>
     <string name="a_social_media_app_icon">a social media app icon</string>
+    <string name="reflection_question">Reflection Question</string>
+    <string name="channel_name">Social Gateway Notification Channel</string>
+    <string name="channel_description">Ask reflection questions some time after a social media app was started.</string>
 </resources>
