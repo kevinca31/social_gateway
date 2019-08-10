@@ -11,6 +11,7 @@ import android.content.SharedPreferences
 import android.media.MediaRecorder
 import android.os.AsyncTask
 import android.os.Bundle
+import android.os.Looper
 import android.support.v7.app.AppCompatActivity
 import android.util.Log
 import android.view.View
@@ -100,36 +101,40 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.social_apps_grid)
+    private fun requestQuestion(socialAppName: String, socialAppIntent: Intent): String? {
+        assert(Looper.myLooper() != Looper.getMainLooper())  // make sure network request is not done on UI thread
 
-        preferences = getPreferences(Context.MODE_PRIVATE)
+        val encodedAppName = URLEncoder.encode(socialAppName, "utf-8")
+        val questionConnection = openConnection("/question?app_name=$encodedAppName")
+        try {
+            if (questionConnection.responseCode != HTTP_OK) {
+                throw ConnectException("response code ${questionConnection.responseCode}")
+            }
 
-        userId = preferences.getString("userId", "").ifEmpty {
-            log("generating new userId")
-            UUID.randomUUID().toString()
+            // success, return question
+            return questionConnection.inputStream.reader().readText()
+        } catch (exception: ConnectException) {
+            // something went wrong. display error, start the app
+            runOnUiThread {
+                Toast.makeText(this, "server unreachable, starting app...", Toast.LENGTH_SHORT).show()
+            }
+            startActivity(socialAppIntent)
+            log("could not request question: ${exception.message.orEmpty()}")
+            finish()
+            return null
+        } finally {
+            questionConnection.disconnect()
         }
-        log("userId: $userId")
+    }
+
+    private fun questionResponseProcess(socialAppName: String, socialAppPackageName: String) {
+        assert(socialAppName.isNotBlank() && socialAppPackageName.isNotBlank())
 
         val mainActivity = this
 
-        findViewById<GridView>(R.id.social_apps_grid).adapter = SocialAppAdapter(mainActivity) { context, socialApp ->
-            startActivity(Intent(context, MainActivity::class.java).apply {
-                putExtra("socialAppName", socialApp.name)
-                putExtra("socialAppPackageName", socialApp.packageName)
-            })
-        }
-
-        // these are only set when started via widget
-        val socialAppName = intent?.extras?.getString("socialAppName").orEmpty()
-        val socialAppPackageName = intent?.extras?.getString("socialAppPackageName").orEmpty()
-
-        // nothing else to do if started directly (not via widget)
-        socialAppName.ifEmpty { return }
-        socialAppPackageName.ifEmpty { return }
-
         val socialAppIntent = packageManager.getLaunchIntentForPackage(socialAppPackageName)
+
+        // check if the given app is installed on the device
         if (socialAppIntent == null) {
             resources.getString(R.string.X_was_not_found_on_your_device, socialAppName).let {
                 Toast.makeText(mainActivity, it, Toast.LENGTH_LONG).show()
@@ -138,37 +143,20 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        // check if the user was already asked a question for this app in the last 24 hours
         if (System.currentTimeMillis() - preferences.getLong(socialAppName, 0) < 86400000) {
-            // last question for this app was asked less than 24 hours ago
             startActivity(socialAppIntent)
             log("already answered question today")
             finish()
             return
         }
 
+        // request a question from the server
         Toast.makeText(mainActivity, "requesting question from server...", Toast.LENGTH_SHORT).show()
         AsyncTask.execute {
-            val question: String
-            val encodedAppName = URLEncoder.encode(socialAppName, "utf-8")
-            val questionConnection = openConnection("/question?app_name=$encodedAppName")
-            try {
-                if (questionConnection.responseCode != HTTP_OK) {
-                    throw ConnectException("response code ${questionConnection.responseCode}")
-                }
+            val question = requestQuestion(socialAppName, socialAppIntent) ?: return@execute
 
-                question = questionConnection.inputStream.reader().readText()
-            } catch (exception: ConnectException) {
-                runOnUiThread {
-                    Toast.makeText(mainActivity, "server unreachable, starting app...", Toast.LENGTH_SHORT).show()
-                }
-                startActivity(socialAppIntent)
-                log("could not request question: ${exception.message.orEmpty()}")
-                finish()
-                return@execute
-            } finally {
-                questionConnection.disconnect()
-            }
-
+            // after receiving the question show the response dialog
             runOnUiThread {
                 val linearLayout = layoutInflater.inflate(R.layout.answer_dialog, null)
                 val answerEditText = linearLayout.findViewById<EditText>(R.id.answer_edit_text)
@@ -206,10 +194,11 @@ class MainActivity : AppCompatActivity() {
                             release()
                         }
 
+                        // send the answer to the server and start the app
                         sendAnswer(socialAppName, question, answerEditText.text.toString())
                         startActivity(socialAppIntent)
 
-                        // received question and sent answer -> no more questions for this app in the next 24 hours
+                        // track when the question was answered, so more questions are asked for this app for 24 hours
                         preferences.edit().apply {
                             putLong(socialAppName, System.currentTimeMillis())
                             apply()
@@ -218,6 +207,35 @@ class MainActivity : AppCompatActivity() {
                     create()
                     show()
                 }
+            }
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.social_apps_grid)
+
+        preferences = getPreferences(Context.MODE_PRIVATE)
+
+        userId = preferences.getString("userId", "").ifEmpty {
+            log("generating new userId")
+            UUID.randomUUID().toString()
+        }
+        log("userId: $userId")
+
+        findViewById<GridView>(R.id.social_apps_grid).adapter = SocialAppAdapter(this) { context, socialApp ->
+            startActivity(Intent(context, MainActivity::class.java).apply {
+                putExtra("socialAppName", socialApp.name)
+                putExtra("socialAppPackageName", socialApp.packageName)
+            })
+        }
+
+        intent?.extras?.let {
+            val socialAppName = it.getString("socialAppName").orEmpty()
+            val socialAppPackageName = it.getString("socialAppPackageName").orEmpty()
+
+            if (socialAppName.isNotBlank() && socialAppPackageName.isNotBlank()) {
+                questionResponseProcess(socialAppName, socialAppPackageName)
             }
         }
     }
