@@ -7,10 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.media.MediaRecorder
-import android.os.AsyncTask
-import android.os.Build
-import android.os.Bundle
-import android.os.Looper
+import android.os.*
 import android.support.v4.app.NotificationCompat
 import android.support.v4.app.NotificationManagerCompat
 import android.support.v7.app.AppCompatActivity
@@ -154,8 +151,6 @@ class MainActivity : AppCompatActivity() {
         AsyncTask.execute {
             val question = requestQuestion(socialAppName) ?: return@execute
 
-            // TODO delay for 10 minutes
-
             runOnUiThread {
                 val intent = Intent(this, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -174,11 +169,12 @@ class MainActivity : AppCompatActivity() {
                     .setContentIntent(pendingIntent)
                     .setAutoCancel(true)
 
-                with(NotificationManagerCompat.from(this)) {
+                // show the reflection question notification with some minutes delay
+                Handler().postDelayed({
                     // notificationId is a unique int for each notification that you must define
                     val notificationId = System.currentTimeMillis() % Int.MAX_VALUE
-                    notify(notificationId.toInt(), builder.build())
-                }
+                    NotificationManagerCompat.from(this).notify(notificationId.toInt(), builder.build())
+                }, 10 * 60 * 1000)
             }
         }
     }
