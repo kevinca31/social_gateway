@@ -1,5 +1,6 @@
 package com.example.socialgateway
 
+import android.annotation.SuppressLint
 import android.app.*
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
@@ -78,14 +79,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var preferences: SharedPreferences
 
     private val channelId = "SocialGatewayChannelId"
+    private val key = "hef3TF^Vg90546bvgFVL>Zzxskfou;aswperwrsf,c/x"
 
-    private fun openConnection(route: String): HttpURLConnection {
-        return URL("http://192.168.178.23:5000$route").openConnection() as HttpURLConnection
+    private fun openConnection(route: String, arguments: String = ""): HttpURLConnection {
+        assert(!route.contains('?'))
+        return URL("http://192.168.178.23:5000$route?key=$key&$arguments").openConnection() as HttpURLConnection
     }
 
-    private fun postToServer(data: ByteArray, route: String) {
+    private fun postToServer(data: ByteArray, route: String, arguments: String = "") {
         AsyncTask.execute {
-            openConnection(route).apply {
+            openConnection(route, arguments).apply {
                 try {
                     requestMethod = "POST"
                     doOutput = true
@@ -106,7 +109,7 @@ class MainActivity : AppCompatActivity() {
         assert(Looper.myLooper() != Looper.getMainLooper())  // make sure network request is not done on UI thread
 
         val encodedAppName = URLEncoder.encode(socialAppName, "utf-8")
-        val questionConnection = openConnection("/question?app_name=$encodedAppName")
+        val questionConnection = openConnection("/question","app_name=$encodedAppName")
         try {
             if (questionConnection.responseCode != HTTP_OK) {
                 throw ConnectException("response code ${questionConnection.responseCode}")
@@ -179,6 +182,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @SuppressLint("InflateParams")
     private fun showResponseDialog(question: String, socialAppName: String, socialAppIntent: Intent? = null) {
         assert(question.isNotBlank() && socialAppName.isNotBlank())
 
@@ -316,7 +320,7 @@ class MainActivity : AppCompatActivity() {
         getAnswerAudioFile().let {
             if (it.exists()) {
                 answerAudioUuid = UUID.randomUUID().toString()
-                postToServer(it.readBytes(), "/audio?uuid=$answerAudioUuid")
+                postToServer(it.readBytes(), "/audio", "uuid=$answerAudioUuid")
                 it.delete()
             }
         }
