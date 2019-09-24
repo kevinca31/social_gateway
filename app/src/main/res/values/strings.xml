@@ -1,8 +1,5 @@
 <resources>
-    <string name="app_name">SocialGateway</string>
-    <string name="whats_app">WhatsApp</string>
-    <string name="telegram">Telegram</string>
-
+    <string name="app_name" translatable="false">SocialGateway</string>
 
     <string name="X_was_not_found_on_your_device">%1$s was not found on your device</string>
     <string name="start_recording">start recording</string>
@@ -11,6 +8,8 @@
     <string name="delete_recording">delete recording</string>
     <string name="a_social_media_app_icon">a social media app icon</string>
     <string name="reflection_question">Reflection Question</string>
-    <string name="channel_name">Social Gateway Notification Channel</string>
+    <string name="channel_name">SocialGateway Notification Channel</string>
     <string name="channel_description">Ask reflection questions some time after a social media app was started.</string>
+    <string name="requesting_question_from_server">requesting question from server…</string>
+    <string name="server_unreachable">server unreachable</string>
 </resources>

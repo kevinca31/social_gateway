@@ -109,7 +109,8 @@ class MainActivity : AppCompatActivity() {
         assert(Looper.myLooper() != Looper.getMainLooper())  // make sure network request is not done on UI thread
 
         val encodedAppName = URLEncoder.encode(socialAppName, "utf-8")
-        val questionConnection = openConnection("/question","app_name=$encodedAppName")
+        val language = if (Locale.getDefault().language == "de") "german" else "english"
+        val questionConnection = openConnection("/question","app_name=$encodedAppName&language=$language")
         try {
             if (questionConnection.responseCode != HTTP_OK) {
                 throw ConnectException("response code ${questionConnection.responseCode}")
@@ -120,7 +121,7 @@ class MainActivity : AppCompatActivity() {
         } catch (exception: ConnectException) {
             // something went wrong. display error, start the app
             runOnUiThread {
-                Toast.makeText(this, "server unreachable", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, resources.getString(R.string.server_unreachable), Toast.LENGTH_SHORT).show()
             }
             socialAppIntent?.let { startActivity(it) }
             log("could not request question: ${exception.message.orEmpty()}")
@@ -268,7 +269,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // request a question from the server
-        Toast.makeText(mainActivity, "requesting question from server...", Toast.LENGTH_SHORT).show()
+        Toast.makeText(mainActivity, resources.getString(R.string.requesting_question_from_server), Toast.LENGTH_SHORT).show()
         AsyncTask.execute {
             val question = requestQuestion(socialAppName, socialAppIntent) ?: return@execute
 
