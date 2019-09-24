@@ -12,6 +12,7 @@ import android.os.*
 import android.support.v4.app.NotificationCompat
 import android.support.v4.app.NotificationManagerCompat
 import android.support.v7.app.AppCompatActivity
+import android.text.format.DateFormat
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
@@ -183,6 +184,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun today(): String? {
+        return DateFormat.format("dd.MM.yyyy", Date()) as String?
+    }
+
     @SuppressLint("InflateParams")
     private fun showResponseDialog(question: String, socialAppName: String, socialAppIntent: Intent? = null) {
         assert(question.isNotBlank() && socialAppName.isNotBlank())
@@ -231,13 +236,15 @@ class MainActivity : AppCompatActivity() {
                     scheduleReflectionQuestion(socialAppName)
                     startActivity(socialAppIntent)
 
-                    // track when the question was answered, so more questions are asked for this app for 24 hours
+                    // track when the question was answered, so more questions are asked for this app today
                     preferences.edit().apply {
-                        putLong(socialAppName, System.currentTimeMillis())
+                        putString(socialAppName, today())
+                        putString("lastQuestionDate", today())
+                        val questionsOnLastQuestionDate = preferences.getInt("questionsOnLastQuestionDate", 0)
+                        putInt("questionsOnLastQuestionDate", questionsOnLastQuestionDate + 1)
                         apply()
                     }
                 }
-
             }
             create()
             show()
@@ -260,10 +267,11 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // check if the user was already asked a question for this app in the last 24 hours
-        if (System.currentTimeMillis() - preferences.getLong(socialAppName, 0) < 86400000) {
+        // check if the user was already asked a question for this app or two questions for any apps today
+        if (preferences.getString(socialAppName, "") == today()
+            || (preferences.getString("lastQuestionDate", "") == today()
+                && preferences.getInt("questionsOnLastQuestionDate", 0) >= 2)) {
             startActivity(socialAppIntent)
-            log("already answered question today")
             finish()
             return
         }
