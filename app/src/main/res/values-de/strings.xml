@@ -2,17 +2,21 @@
 <resources>
     <string name="X_was_not_found_on_your_device">%1$s wurde auf deinem Gerät nicht gefunden</string>
     <string name="a_social_media_app_icon">ein Social Media App Symbol</string>
-    <string name="channel_description">Frage Reflektionsfragen einige Zeit nach dem Starten einer
-        Social Media App.
+    <string name="channel_description">
+        Frage Reflektionsfragen einige Zeit nach dem Starten einer Social Media App.
     </string>
     <string name="channel_name">SocialGateway Benachrichtigungskanal</string>
     <string name="delete_recording">lösche Aufnahme</string>
     <string name="reflection_question">Reflektionsfrage</string>
+    <string name="check_in_question">Tagesfrage</string>
     <string name="start_recording">starte Aufnahme</string>
     <string name="stop_recording">stoppe Aufnahme</string>
-    <string name="type_answer_here_or_record_audio">schreibe eine Antwort oder nimm eine
-        Audionachricht auf
+    <string name="type_answer_here_or_record_audio">
+        schreibe eine Antwort oder nimm eine Sprachnachricht auf
     </string>
     <string name="requesting_question_from_server">Lade Frage vom Server…</string>
     <string name="server_unreachable">Server nicht erreichbar</string>
+    <string name="check_in_question_value">
+        Wenn du daran denkst wie du dein Smartphone heute genutzt hast, wie fühlst du dich?
+    </string>
 </resources>

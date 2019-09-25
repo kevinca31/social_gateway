@@ -2,6 +2,7 @@ package com.example.socialgateway
 
 import android.annotation.SuppressLint
 import android.app.*
+import android.app.PendingIntent.FLAG_CANCEL_CURRENT
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
@@ -25,6 +26,9 @@ import java.net.HttpURLConnection.HTTP_OK
 import java.net.URL
 import java.net.URLEncoder
 import java.util.*
+import java.util.Calendar.*
+
+val channelId = "SocialGatewayChannelId"
 
 fun log(message: String) {
     Log.d("SocialGateway", message)
@@ -72,14 +76,14 @@ class SocialAppAdapter(private val context: Context, private val onClick: (Conte
     }
 }
 
-enum class IntentCategory { AskQuestion, Reflection }
+enum class IntentCategory { AskQuestion, Reflection, CheckIn }
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var userId: String
     private lateinit var preferences: SharedPreferences
 
-    private val channelId = "SocialGatewayChannelId"
+
     private val key = "hef3TF^Vg90546bvgFVL>Zzxskfou;aswperwrsf,c/x"
 
     private fun openConnection(route: String, arguments: String = ""): HttpURLConnection {
@@ -154,7 +158,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun scheduleReflectionQuestion(socialAppName: String) {
         AsyncTask.execute {
-            val question = requestQuestion(socialAppName) ?: return@execute
+            val question = requestQuestion(socialAppName) ?: return@execute  // TODO request reflection question
 
             runOnUiThread {
                 val intent = Intent(this, MainActivity::class.java).apply {
@@ -231,7 +235,7 @@ class MainActivity : AppCompatActivity() {
                 // send the answer to the server and start the app
                 sendAnswer(socialAppName, question, answerEditText.text.toString())
 
-                // socialAppIntent is null for reflection questions
+                // socialAppIntent is null for reflection and check-in questions
                 if (socialAppIntent != null) {
                     scheduleReflectionQuestion(socialAppName)
                     startActivity(socialAppIntent)
@@ -319,8 +323,23 @@ class MainActivity : AppCompatActivity() {
                     showResponseDialog(it.getString("question").orEmpty(),
                                        it.getString("socialAppName").orEmpty())
                 }
+                IntentCategory.CheckIn -> {
+                    showResponseDialog(it.getString("question").orEmpty(), "check-in")
+                }
             }
         }
+
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val dailyTriggerTime = Calendar.getInstance().apply {
+            set(HOUR_OF_DAY, 21)
+            set(MINUTE, 0)
+            set(SECOND, 0)
+        }.timeInMillis
+
+        val pendingIntent = PendingIntent.getBroadcast(this, 346538746,
+            Intent(this, AlarmReceiver::class.java), PendingIntent.FLAG_UPDATE_CURRENT)
+
+        alarmManager.setRepeating(AlarmManager.RTC, dailyTriggerTime, AlarmManager.INTERVAL_DAY, pendingIntent)
     }
 
     private fun sendAnswer(appName: String, question: String, answerText: String) {
