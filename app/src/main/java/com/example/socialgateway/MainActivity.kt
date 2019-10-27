@@ -1,17 +1,20 @@
 package com.example.socialgateway
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.*
-import android.app.PendingIntent.FLAG_CANCEL_CURRENT
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.media.MediaRecorder
 import android.os.*
+import android.support.v4.app.ActivityCompat
 import android.support.v4.app.NotificationCompat
 import android.support.v4.app.NotificationManagerCompat
+import android.support.v4.content.ContextCompat
 import android.support.v7.app.AppCompatActivity
 import android.text.format.DateFormat
 import android.util.Log
@@ -28,7 +31,7 @@ import java.net.URLEncoder
 import java.util.*
 import java.util.Calendar.*
 
-val channelId = "SocialGatewayChannelId"
+const val channelId = "SocialGatewayChannelId"
 
 fun log(message: String) {
     Log.d("SocialGateway", message)
@@ -88,7 +91,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun openConnection(route: String, arguments: String = ""): HttpURLConnection {
         assert(!route.contains('?'))
-        return URL("http://192.168.178.23:5000$route?key=$key&$arguments").openConnection() as HttpURLConnection
+        return URL("https://hpi.de/baudisch/projects/neo4j/api$route?key=$key&$arguments").openConnection() as HttpURLConnection
     }
 
     private fun postToServer(data: ByteArray, route: String, arguments: String = "") {
@@ -115,7 +118,10 @@ class MainActivity : AppCompatActivity() {
 
         val encodedAppName = URLEncoder.encode(socialAppName, "utf-8")
         val language = if (Locale.getDefault().language == "de") "german" else "english"
-        val questionConnection = openConnection("/question","app_name=$encodedAppName&language=$language")
+        val questionType = if (socialAppIntent == null) "reflection" else "normal"
+        val questionConnection = openConnection(
+            "/question","app_name=$encodedAppName&language=$language&question_type=$questionType")
+
         try {
             if (questionConnection.responseCode != HTTP_OK) {
                 throw ConnectException("response code ${questionConnection.responseCode}")
@@ -202,22 +208,27 @@ class MainActivity : AppCompatActivity() {
         val answerRecordAudioButton = linearLayout.findViewById<Button>(R.id.answer_record_audio_button)
         var mediaRecorder: MediaRecorder? = null
         answerRecordAudioButton.setOnClickListener {
-            when {
-                answerRecordAudioButton.text == getString(R.string.delete_recording) -> {
-                    getAnswerAudioFile().delete()
-                    answerRecordAudioButton.text = getString(R.string.start_recording)
-                }
-                mediaRecorder == null -> {
-                    mediaRecorder = startAudioRecording()
-                    answerRecordAudioButton.text = getString(R.string.stop_recording)
-                }
-                else -> {
-                    mediaRecorder?.apply {
-                        stop()
-                        release()
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 82)
+            } else {
+                when {
+                    answerRecordAudioButton.text == getString(R.string.delete_recording) -> {
+                        getAnswerAudioFile().delete()
+                        answerRecordAudioButton.text = getString(R.string.start_recording)
                     }
-                    mediaRecorder = null
-                    answerRecordAudioButton.text = getString(R.string.delete_recording)
+                    mediaRecorder == null -> {
+                        mediaRecorder = startAudioRecording()
+                        answerRecordAudioButton.text = getString(R.string.stop_recording)
+                    }
+                    else -> {
+                        mediaRecorder?.apply {
+                            stop()
+                            release()
+                        }
+                        mediaRecorder = null
+                        answerRecordAudioButton.text = getString(R.string.delete_recording)
+                    }
                 }
             }
         }
