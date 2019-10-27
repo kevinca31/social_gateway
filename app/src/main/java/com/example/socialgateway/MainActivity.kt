@@ -234,7 +234,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         AlertDialog.Builder(this).apply {
-            setTitle(question)
+            setMessage(question)
             setView(linearLayout)
             setNegativeButton(android.R.string.cancel) { _, _ -> }
             setPositiveButton(android.R.string.ok) { _, _ ->
