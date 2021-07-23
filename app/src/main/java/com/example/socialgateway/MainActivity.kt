@@ -43,13 +43,18 @@ data class SocialApp(
     val imageId: Int)
 
 val socialApps = listOf(
-    SocialApp("Telegram", "org.telegram.messenger", R.drawable.telegram),
-    SocialApp("WhatsApp", "com.whatsapp", R.drawable.whatsapp),
-    SocialApp("Facebook", "com.facebook.katana", R.drawable.facebook),
-    SocialApp("Facebook Messenger", "com.facebook.orca", R.drawable.facebook_messenger),
-    SocialApp("Instagram", "com.instagram.android", R.drawable.instagram),
-    SocialApp("Signal", "org.thoughtcrime.securesms", R.drawable.signal),
-    SocialApp("Snapchat", "com.snapchat.android", R.drawable.snapchat))
+        SocialApp("Telegram", "org.telegram.messenger", R.drawable.telegram),
+        SocialApp("WhatsApp", "com.whatsapp", R.drawable.whatsapp),
+        SocialApp("Facebook", "com.facebook.katana", R.drawable.facebook),
+        SocialApp("Facebook Messenger", "com.facebook.orca", R.drawable.facebook_messenger),
+        SocialApp("Instagram", "com.instagram.android", R.drawable.instagram),
+        SocialApp("Signal", "org.thoughtcrime.securesms", R.drawable.signal),
+        SocialApp("Snapchat", "com.snapchat.android", R.drawable.snapchat),
+        SocialApp("TikTok","com.zhiliaoapp.musically", R.drawable.tiktok),
+        SocialApp("Discord", "com.discord", R.drawable.discord),
+        SocialApp("Reddit", "com.reddit.frontpage", R.drawable.reddit),
+        SocialApp("Tumblr", "com.tumblr", R.drawable.tumblr),
+        SocialApp("Twitter", "com.twitter.android", R.drawable.twitter))
 
 
 class SocialAppAdapter(private val context: Context, private val onClick: (Context, SocialApp) -> Unit)
